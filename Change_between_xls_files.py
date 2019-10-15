@@ -1,4 +1,5 @@
-#!/nfs/sc/disks/sc_rtl_users_0002/ryanjose/python/bin/python2.7
+#!/usr/intel/pkgs/python3/3.6.3a/bin/python3
+
 import sys
 sys.path.append('/usr/intel/pkgs/python3/3.6.3/modules/r1/lib/python3.6/site-packages/')
 
@@ -6,8 +7,8 @@ import xlrd       # Module for Reading an excel file
 import xlsxwriter # Module for Writing an excel file 
 
 # Giving the location of the old and new files 
-location_oldfile = ("/nfs/sc/disks/sc_rtl_users_0002/asarode/script_automation/old_file_lor_fake.xls") 
-location_newfile = ("/nfs/sc/disks/sc_rtl_users_0002/asarode/script_automation/new_file_lor_fake.xls") 
+location_oldfile = ("/nfs/sc/disks/sc_rtl_users_0002/asarode/script_automation/old_file_lor_fake_wo_ref.xls") 
+location_newfile = ("/nfs/sc/disks/sc_rtl_users_0002/asarode/script_automation/new_file_lor_fake_wo_ref.xls") 
   
 # Opening old file and its logic on reset sheet for reading 
 old_file = xlrd.open_workbook(location_oldfile) 
@@ -21,6 +22,9 @@ lor_sheet_new_file = new_file.sheet_by_index(7)
 update_file = xlsxwriter.Workbook('lor_update.xlsx')
 lor_sheet_diff = update_file.add_worksheet('lor_difference_report')
 
+# Add a bold format to use to highlight cells.
+bold = update_file.add_format({'bold': 1})
+
 # Number of rows in sheets old and new files
 no_rows_old_sheet = lor_sheet_old_file.nrows
 no_rows_new_sheet = lor_sheet_new_file.nrows
@@ -32,27 +36,30 @@ no_columns_new_sheet = lor_sheet_new_file.ncols
 row_of_diff_file = 0  # initializing row number from 3rd row onwards
 
 # Initializing the New xls with writing its column names
-#lor_sheet_diff.write(1, 2, '*** Old Violations that has not resolved ***')
-#lor_sheet_diff.write(1, 2, '*** Old Violations that has not resolved ***')
+
+cell_format = update_file.add_format({'bold': True, 'bg_color': '#33CCCC'})
+cell_format2 = update_file.add_format({'bold': True, 'font_color': 'red'})
 
 for col_no in range(no_columns_old_sheet):
-    lor_sheet_diff.write(row_of_diff_file, col_no, str(lor_sheet_old_file.col_values(col_no)[0]))
+    lor_sheet_diff.write(row_of_diff_file, col_no, str(lor_sheet_old_file.col_values(col_no)[0]),cell_format)
 row_of_diff_file = row_of_diff_file + 1
 
 # Adding comment line for first section
-lor_sheet_diff.write(row_of_diff_file, 2, '*** Old Violations that has not resolved ***')
+lor_sheet_diff.write(row_of_diff_file, 2, '*** Old Violations that has not resolved ***',cell_format2)
 row_of_diff_file = row_of_diff_file + 1
+
+col_no_list = [0,1,2,4,5]
 
 # First section algorithm 
 for l1 in range(1,no_rows_new_sheet):
     
     temp_row_new_list = []
-    for m in range(6): # making a temporary list of a particular row from new file   
+    for m in col_no_list: # making a temporary list of a particular row from new file   
         temp_row_new_list.append(str(lor_sheet_new_file.col_values(m)[l1]))
 
     for l2 in range(1,no_rows_old_sheet):
         temp_row_old_list = []
-        for n in range(6): # making a temporary list of a particular row from old file 
+        for n in col_no_list: # making a temporary list of a particular row from old file 
             temp_row_old_list.append(str(lor_sheet_old_file.col_values(n)[l2]))        
 
         if(temp_row_new_list==temp_row_old_list): 
@@ -62,7 +69,7 @@ for l1 in range(1,no_rows_new_sheet):
             row_of_diff_file = row_of_diff_file + 1
 
 # Adding comment line for second section
-lor_sheet_diff.write(row_of_diff_file,2, '*** New Violations ***')
+lor_sheet_diff.write(row_of_diff_file,2, '*** New Violations ***',cell_format2)
 row_of_diff_file = row_of_diff_file + 1
 
 # Second section algorithm
@@ -70,13 +77,13 @@ for l1 in range(1,no_rows_new_sheet):
     
     temp_row_new_list = []
 
-    for m in range(6): # making a temporary list of a particular row from new file   
+    for m in col_no_list: # making a temporary list of a particular row from new file   
         temp_row_new_list.append(str(lor_sheet_new_file.col_values(m)[l1]))
     x=0
     for l2 in range(1,no_rows_old_sheet):
         
         temp_row_old_list = []
-        for n in range(6): # making a temporary list of a particular row from old file 
+        for n in col_no_list: # making a temporary list of a particular row from old file 
             temp_row_old_list.append(str(lor_sheet_old_file.col_values(n)[l2]))
         
         if(temp_row_new_list==temp_row_old_list): 
@@ -87,19 +94,19 @@ for l1 in range(1,no_rows_new_sheet):
         row_of_diff_file = row_of_diff_file + 1
 
 # Adding comment line for third section
-lor_sheet_diff.write(row_of_diff_file,2, '*** Old Violations that has resolved ***')
+lor_sheet_diff.write(row_of_diff_file,2, '*** Old Violations that has resolved ***',cell_format2)
 row_of_diff_file = row_of_diff_file + 1
 
 # Third section algorithm
 for l1 in range(1,no_rows_old_sheet):
     
     temp_row_old_list = []
-    for m in range(6): # making a temporary list of a particular row from old file   
+    for m in col_no_list: # making a temporary list of a particular row from old file   
         temp_row_old_list.append(str(lor_sheet_old_file.col_values(m)[l1]))
     x=0
     for l2 in range(1,no_rows_new_sheet):
         temp_row_new_list = []
-        for n in range(6): # making a temporary list of a particular row from new file 
+        for n in col_no_list: # making a temporary list of a particular row from new file 
             temp_row_new_list.append(str(lor_sheet_new_file.col_values(n)[l2]))
         
         if(temp_row_old_list==temp_row_new_list): 
@@ -111,3 +118,4 @@ for l1 in range(1,no_rows_old_sheet):
 
 # Closing the file
 update_file.close()
+
