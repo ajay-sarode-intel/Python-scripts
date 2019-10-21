@@ -8,127 +8,144 @@ import xlrd       # Module for Reading an excel file
 import xlsxwriter # Module for Writing an excel file 
 import argparse   # Module for arguments parsing
 
-# Argument Parser
-
-parser = argparse.ArgumentParser(description='Script for missing clock on dual clock cell report')
+#### Arguments Parser ####
+parser = argparse.ArgumentParser(description='Script for syn caliber Missing clocks on dual clock cells')
 parser.add_argument('-input_ref', type=str, help='Old/Reference file path')
-parser.add_argument('-input_new', type=str, help='new file path')
-parser.add_argument('-output', type=str, help='output file path')
-parser.add_argument('--Help', help='Script for finding diff between two reports of missing clock on dual clock cell. Script is format dependent, script will not work if format is changed')
+parser.add_argument('-input_new', type=str, help='New file path')
+parser.add_argument('-output', type=str, help='Diffd/Output file path')
+parser.add_argument('--Help', help='Script for finding diff between two reports of syn caliber Missing clock on dual clock cell. Script is format dependent, script will not work if format is changed')
 args = parser.parse_args()
-old_file_name = args.input_ref  # Old file location with file name ex. /path/old.xls
-new_file_name = args.input_new  # New file location with file name
-output_file_name = args.output  # Output file location with file name
-  
-# Opening old file and its logic on reset sheet for reading 
+old_file_name = args.input_ref
+new_file_name = args.input_new
+output_file_name = args.output
+
+name_of_sheet = 'MissingClockOnDualClockCells'
+
+# Opening old file, opening specific sheet if exists otherwise terminate the program with error message
 old_file = xlrd.open_workbook(old_file_name) 
-mcdcc_sheet_old_file = old_file.sheet_by_name('MissingClockOnDualClockCells') 
+sheet_names_old_file = old_file.sheet_names()
+if name_of_sheet not in sheet_names_old_file: 
+    sys.exit('MissingClockOnDualClockCells Sheet in Reference/Old file does not exists')
+sheet_old_file = old_file.sheet_by_name(name_of_sheet) 
 
-# Opening new file and its logic on reset sheet for reading 
+# Opening new file, opening specific sheet if exists otherwise terminate the program with error message 
 new_file = xlrd.open_workbook(new_file_name) 
-mcdcc_sheet_new_file = new_file.sheet_by_name('MissingClockOnDualClockCells') 
+sheet_names_new_file = new_file.sheet_names()
+if name_of_sheet not in sheet_names_new_file: 
+    sys.exit('MissingClockOnDualClockCells Sheet in New file does not exists')
+sheet_new_file = new_file.sheet_by_name(name_of_sheet) 
 
-# Creating a new file to store the bucket splitted (diff) version
-#update_file = xlsxwriter.Workbook('lor_update.xlsx')
+# Creating a new file of given name to store the bucket splitted (diff) version
 update_file = xlsxwriter.Workbook(output_file_name)
-mcdcc_sheet_diff = update_file.add_worksheet('MissingClockOnDualClockCells') 
+sheet_diff = update_file.add_worksheet(name_of_sheet)
 
-# Add a bold format to use to highlight cells.
+# Various formats to highlight/bold/color cells.
 bold = update_file.add_format({'bold': 1})
+bold_bg_cyan = update_file.add_format({'bold': True, 'bg_color': '#33CCCC'})
+bold_font_red = update_file.add_format({'bold': False, 'font_color': 'red'})
+bold_font_green = update_file.add_format({'bold': False, 'font_color': 'green'})
+bold_font_blue = update_file.add_format({'bold': False, 'font_color': 'blue'})
 
 # Number of rows in sheets old and new files
-no_rows_old_sheet = mcdcc_sheet_old_file.nrows
-no_rows_new_sheet = mcdcc_sheet_new_file.nrows
+no_rows_old_sheet = sheet_old_file.nrows
+no_rows_new_sheet = sheet_new_file.nrows
 
 # Number of columns in old and new files
-no_columns_old_sheet = mcdcc_sheet_old_file.ncols
-no_columns_new_sheet = mcdcc_sheet_new_file.ncols
+no_columns_old_sheet = sheet_old_file.ncols
+no_columns_new_sheet = sheet_new_file.ncols
 
-row_of_diff_file = 4  # initializing row number of a diff file with 0
+row_of_diff_file = 4  # initializing row number of a diff file sheet with 4th column (starting from 0)
 
-# Initializing the New xls with writing its column names
-
-cell_format = update_file.add_format({'bold': True, 'bg_color': '#33CCCC'})
-cell_format2 = update_file.add_format({'bold': True, 'font_color': 'red'})
-
+# Initializing the New xls with writing its column names same as of old file and adding Result column
 for col_no in range(no_columns_old_sheet):
-    mcdcc_sheet_diff.write(row_of_diff_file, col_no, str(mcdcc_sheet_old_file.col_values(col_no)[4]),cell_format)
+    sheet_diff.write(row_of_diff_file, col_no, str(sheet_old_file.col_values(col_no)[4]),bold_bg_cyan)
+sheet_diff.write(row_of_diff_file, 5, 'Comments',bold_bg_cyan)
+sheet_diff.write(row_of_diff_file, 6, 'Waive',bold_bg_cyan)
+sheet_diff.write(row_of_diff_file, 7, 'Result',bold_bg_cyan)
 row_of_diff_file = row_of_diff_file + 1
 
-# Adding comment line for first section
-mcdcc_sheet_diff.write(row_of_diff_file, 2, '*** Propagated Violations ***',cell_format2)
-row_of_diff_file = row_of_diff_file + 1
+##################### Subroutine for conversion of Whole row to Comparable String #######################
+col_no_list = [1,2,4]  # Absolute Columns to be Compared
+ref_net_cell_col = 3 # Reference/net/cell/ name column for some part comparison
+def row_2_list(row_no,sheet_name) :
+    temp_list = [] 
+    for s in col_no_list: # making a temporary list of a particular row from new file   
+        temp_list.append(str(sheet_name.col_values(s)[row_no]))
 
-col_no_list = [1,2,4]
+    temp_str = str(sheet_name.col_values(ref_net_cell_col)[row_no])
+    if (temp_str[0]=='e') :
+        temp_list.append(temp_str[0:11])
+    else :
+        temp_list.append(temp_str)
 
-# First section algorithm 
+    return temp_list
+#########################################################################################################
+
+#### First section algorithm for Same as Before
+
 for l1 in range(5,no_rows_new_sheet):
     
-    temp_row_new_list = []
-    for m in col_no_list: # making a temporary list of a particular row from new file   
-        temp_row_new_list.append(str(mcdcc_sheet_new_file.col_values(m)[l1]))
-
+    temp_row_new_list = []  # making a temporary list of a particular row from new file
+    temp_row_new_list = row_2_list(l1,sheet_new_file)
+    
     for l2 in range(5,no_rows_old_sheet):
-        temp_row_old_list = []
-        for n in col_no_list: # making a temporary list of a particular row from old file 
-            temp_row_old_list.append(str(mcdcc_sheet_old_file.col_values(n)[l2]))        
+    
+        temp_row_old_list = [] # making a temporary list of a particular row from old file  
+        temp_row_old_list = row_2_list(l2,sheet_old_file)        
 
         if(temp_row_new_list==temp_row_old_list): 
             
             for col_no in range(1,no_columns_old_sheet):
-                mcdcc_sheet_diff.write(row_of_diff_file, col_no, str(mcdcc_sheet_old_file.col_values(col_no)[l2]))
-            mcdcc_sheet_diff.write(row_of_diff_file, 3, str(mcdcc_sheet_new_file.col_values(3)[l1]))
+                sheet_diff.write(row_of_diff_file, col_no, str(sheet_old_file.col_values(col_no)[l2]))
+            sheet_diff.write(row_of_diff_file, 4, str(sheet_new_file.col_values(4)[l1])) # ref_name Copying from sheet of new file
+            sheet_diff.write(row_of_diff_file, 7, 'Same as Before',bold_font_blue) # Writing its category in 7th column
+            
             row_of_diff_file = row_of_diff_file + 1
 
-# Adding comment line for second section
-mcdcc_sheet_diff.write(row_of_diff_file,2, '*** New Violations ***',cell_format2)
-row_of_diff_file = row_of_diff_file + 1
+#### Second section algorithm for New Violations
 
-# Second section algorithm
 for l1 in range(5,no_rows_new_sheet):
     
-    temp_row_new_list = []
-
-    for m in col_no_list: # making a temporary list of a particular row from new file   
-        temp_row_new_list.append(str(mcdcc_sheet_new_file.col_values(m)[l1]))
+    temp_row_new_list = []  # making a temporary list of a particular row from new file
+    temp_row_new_list = row_2_list(l1,sheet_new_file)
     x=0
+    
     for l2 in range(5,no_rows_old_sheet):
         
-        temp_row_old_list = []
-        for n in col_no_list: # making a temporary list of a particular row from old file 
-            temp_row_old_list.append(str(mcdcc_sheet_old_file.col_values(n)[l2]))
+        temp_row_old_list = [] # making a temporary list of a particular row from old file  
+        temp_row_old_list = row_2_list(l2,sheet_old_file) 
         
         if(temp_row_new_list==temp_row_old_list): 
             x = 1
+            
     if(x==0):
         for col_no in range(1,no_columns_new_sheet):
-            mcdcc_sheet_diff.write(row_of_diff_file, col_no, str(mcdcc_sheet_new_file.col_values(col_no)[l1]))
+            sheet_diff.write(row_of_diff_file, col_no, str(sheet_new_file.col_values(col_no)[l1]))
+        sheet_diff.write(row_of_diff_file, 7, 'New Violation',bold_font_red) # Writing its category in 7th column
         row_of_diff_file = row_of_diff_file + 1
 
-# Adding comment line for third section
-mcdcc_sheet_diff.write(row_of_diff_file,2, '*** Fixed Violations ***',cell_format2)
-row_of_diff_file = row_of_diff_file + 1
+#### Third section algorithm for Removed Violations
 
-# Third section algorithm
 for l1 in range(5,no_rows_old_sheet):
     
-    temp_row_old_list = []
-    for m in col_no_list: # making a temporary list of a particular row from old file   
-        temp_row_old_list.append(str(mcdcc_sheet_old_file.col_values(m)[l1]))
+    temp_row_old_list = [] # making a temporary list of a particular row from old file
+    temp_row_old_list = row_2_list(l1,sheet_old_file)
     x=0
+    
     for l2 in range(5,no_rows_new_sheet):
-        temp_row_new_list = []
-        for n in col_no_list: # making a temporary list of a particular row from new file 
-            temp_row_new_list.append(str(mcdcc_sheet_new_file.col_values(n)[l2]))
-        
+    
+        temp_row_new_list = [] # making a temporary list of a particular row from new file
+        temp_row_new_list = row_2_list(l2,sheet_new_file)
+
         if(temp_row_old_list==temp_row_new_list): 
             x = 1
+            
     if(x==0):
         for col_no in range(1,no_columns_old_sheet):
-            mcdcc_sheet_diff.write(row_of_diff_file, col_no, str(mcdcc_sheet_old_file.col_values(col_no)[l1]))
+            sheet_diff.write(row_of_diff_file, col_no, str(sheet_old_file.col_values(col_no)[l1]))
+        sheet_diff.write(row_of_diff_file, 7, 'Removed Violation',bold_font_green) # Writing its category in 7th column
         row_of_diff_file = row_of_diff_file + 1
 
 # Closing the file
 update_file.close()
-
 
