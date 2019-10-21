@@ -1,66 +1,121 @@
-from itertools import izip_longest
-import csv
-import argparse   # Module for arguments parsing
-
+#!/usr/intel/pkgs/python3/3.6.3a/bin/python3
 ## Script Owner : Ajay Sarode
 
-# Argument Parser
+import sys
+sys.path.append('/usr/intel/pkgs/python3/3.6.3/modules/r1/lib/python3.6/site-packages/')
 
-parser = argparse.ArgumentParser(description='Script for unloaded registers report')
+import xlrd       # Module for Reading an excel file 
+import xlsxwriter # Module for Writing an excel file 
+import argparse   # Module for arguments parsing
+
+#### Arguments Parser ####
+parser = argparse.ArgumentParser(description='Script for Unloadeded registers report')
 parser.add_argument('-input_ref', type=str, help='Old/Reference file path')
-parser.add_argument('-input_new', type=str, help='new file path')
-parser.add_argument('-output', type=str, help='output file path')
-parser.add_argument('--Help', help='Script for finding diff between two reports of unloaded registers. Script is format dependent, script will not work if format is changed')
+parser.add_argument('-input_new', type=str, help='New file path')
+parser.add_argument('-output', type=str, help='Diffd/Output file path')
+parser.add_argument('--Help', help='Script for finding diff between two reports of Unloadeded registers. Script is strictly format dependent, hence will not work if format is changed')
 args = parser.parse_args()
-old_file_name = args.input_ref  # Old file location with file name ex. /path/old.xls
-new_file_name = args.input_new  # New file location with file name
-output_file_name = args.output  # Output file location with file name
+old_file_name = args.input_ref
+new_file_name = args.input_new
+output_file_name = args.output
 
-# This part of code open and reads the two input csv files
+name_of_sheet = 'UnloadedRegisters'
+# Opening old file, opening specific sheet if exists otherwise terminate the program with error message
+old_file = xlrd.open_workbook(old_file_name) 
+sheet_names_old_file = old_file.sheet_names()
+if name_of_sheet not in sheet_names_old_file: 
+    sys.exit('UnloadedRegisters Sheet in Reference/Old file does not exists')
+sheet_old_file = old_file.sheet_by_name(name_of_sheet) 
 
-t1 = open(old_file_name, 'r')
-t2 = open(new_file_name, 'r')
+# Opening new file, opening specific sheet if exists otherwise terminate the program with error message 
+new_file = xlrd.open_workbook(new_file_name) 
+sheet_names_new_file = new_file.sheet_names()
+if name_of_sheet not in sheet_names_new_file: 
+    sys.exit('UnloadedRegisters Sheet in New file does not exists')
+sheet_new_file = new_file.sheet_by_name(name_of_sheet) 
 
-with open(old_file_name, 'r') as t1, open(new_file_name, 'r') as t2:
-    fileone = t1.readlines()
-    filetwo = t2.readlines()
+# Creating a new file of given name to store the bucket splitted (diff) version
+update_file = xlsxwriter.Workbook(output_file_name)
+sheet_diff = update_file.add_worksheet(name_of_sheet)
 
-# This part of code copies old violations with comments and keep violation as it is if previous comment was not present 
+# Various formats to highlight/bold/color cells.
+bold = update_file.add_format({'bold': 1})
+bold_bg_cyan = update_file.add_format({'bold': True, 'bg_color': '#33CCCC'})
+bold_font_red = update_file.add_format({'bold': False, 'font_color': 'red'})
+bold_font_green = update_file.add_format({'bold': False, 'font_color': 'green'})
+bold_font_blue = update_file.add_format({'bold': False, 'font_color': 'blue'})
 
-with open(output_file_name, 'w') as outFile:
-    outFile.write('*** Propagated Violations ***\n')
-    for line in filetwo:
-        array2 = line.split(',')
-        for line in fileone:
-            array1 = line.split(',')
-            if array2[0] == array1[0] :
-                outFile.write(",".join(array1)) 
+# Number of rows in sheets old and new files
+no_rows_old_sheet = sheet_old_file.nrows
+no_rows_new_sheet = sheet_new_file.nrows
 
-# This part of code writes only new violations which are not present in old file    
+# Number of columns in old and new files
+no_columns_old_sheet = sheet_old_file.ncols
+no_columns_new_sheet = sheet_new_file.ncols
 
-with open(output_file_name, 'a') as outFile:
-    outFile.write('*** New Violations ***\n')
-    for line in filetwo:
-        array2 = line.split(',')
-        s=0   # s is initialized as zero
-        for line in fileone:
-            array1 = line.split(',')
-            if array2[0] == array1[0] :
-                s = s+1 # s incrments only if violation from two files matches
-        if s==0 :
-            outFile.write(",".join(array2))
+row_of_diff_file = 0  # initializing row number of a diff file sheet with 4th column (starting from 0)
 
-# This part of code writes violations which are resolved and not present in old file 
+# Initializing the New xls with writing its column names same as of old file and adding Result column
+for col_no in range(no_columns_old_sheet):
+    sheet_diff.write(row_of_diff_file, col_no, str(sheet_old_file.col_values(col_no)[0]),bold_bg_cyan)
+sheet_diff.write(row_of_diff_file, 2, 'Result',bold_bg_cyan)
+sheet_diff.write(row_of_diff_file, 1, 'Comments',bold_bg_cyan)
+row_of_diff_file = row_of_diff_file + 1
 
-with open(output_file_name, 'a') as outFile:
-    outFile.write('*** Fixed Violations ***\n')
-    for line in fileone:
-        array1 = line.split(',')
-        p=0   # p is initialized as zero
-        for line in filetwo:
-            array2 = line.split(',')
-            if array1[0] == array2[0] :
-                p = p+1 # p incrments only if violation from two files matches
-        if p==0 :
-            outFile.write(",".join(array1))
+#### First section algorithm for Same as Before
+
+for l1 in range(1,no_rows_new_sheet):
+    
+    temp_row_new_list = str(sheet_new_file.col_values(0)[l1])
+    for l2 in range(1,no_rows_old_sheet):
+           
+        temp_row_old_list = str(sheet_old_file.col_values(0)[l2])
+
+        if(temp_row_new_list==temp_row_old_list): 
+            
+            for col_no in range(no_columns_old_sheet):
+                sheet_diff.write(row_of_diff_file, col_no, str(sheet_old_file.col_values(col_no)[l2]))
+            sheet_diff.write(row_of_diff_file, 2, 'Same as Before',bold_font_blue) # Writing its category in 10th column            
+            row_of_diff_file = row_of_diff_file + 1
+
+#### Second section algorithm for New Violations
+
+for l1 in range(1,no_rows_new_sheet):
+    
+    temp_row_new_list = str(sheet_new_file.col_values(0)[l1])
+    x=0
+    
+    for l2 in range(1,no_rows_old_sheet):
+
+        temp_row_old_list = str(sheet_old_file.col_values(0)[l2])
+        if(temp_row_new_list==temp_row_old_list): 
+            x = 1
+            
+    if(x==0):
+        for col_no in range(no_columns_new_sheet):
+            sheet_diff.write(row_of_diff_file, col_no, str(sheet_new_file.col_values(col_no)[l1]))
+        sheet_diff.write(row_of_diff_file, 2, 'New Violation',bold_font_red) # Writing its category in 10th column
+        row_of_diff_file = row_of_diff_file + 1
+
+#### Third section algorithm for Removed Violations
+
+for l1 in range(1,no_rows_old_sheet):
+
+    temp_row_old_list = str(sheet_old_file.col_values(0)[l1])
+    x=0
+    
+    for l2 in range(1,no_rows_new_sheet):
+    
+        temp_row_new_list = str(sheet_new_file.col_values(0)[l2])
+        if(temp_row_old_list==temp_row_new_list): 
+            x = 1           
+
+    if(x==0):
+        for col_no in range(no_columns_old_sheet):
+            sheet_diff.write(row_of_diff_file, col_no, str(sheet_old_file.col_values(col_no)[l1]))
+        sheet_diff.write(row_of_diff_file, 2, 'Removed Violation',bold_font_green) # Writing its category in 10th column
+        row_of_diff_file = row_of_diff_file + 1
+
+# Closing the file
+update_file.close()
 
